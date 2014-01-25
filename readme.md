@@ -17,8 +17,12 @@ installs to /var/lib/mfsplash and /usr/local/sbin -- currently not configurable 
 
 
 Then you can use it like so
+
 	mfsplash /var/lib/mfsplash/icon/blah.png 50 - splash at 50% with this icon
+
 	battery - shows current battery level and charging/not (require acpi)
+
 	brightness [up|down] - change screen brightness (with sys backlight files)
+
 	volume [up|down|int] - change master volume (requires amixer)
 
