@@ -95,10 +95,10 @@ void consumeEvents(Display* dpy, Window w, int percentage) {
 		printf("Got event: %d\n", e.type);
 
 		switch (e.type) {
-			case ConfigureNotify:
-			case Expose:
+			//case ConfigureNotify:
+			//case Expose:
 			case MapNotify:
-				paint(w, percentage);
+				//paint(w, percentage);
 				shapeit(w);
 				break;
 		}
@@ -136,17 +136,28 @@ void writeArgsToFile(char**argv) {
 }
 
 void animateTo(Display* dpy, Window w, int percentage) {
-	int delta = (percentage - lastpercentage) / 40;
-	if(delta == 0) delta = percentage > lastpercentage ? 1 : -1;
-	while(percentage != lastpercentage) {
-		lastpercentage += delta;
-		consumeEvents(dpy, w, lastpercentage);
+	int delta;
+
+	if(percentage == lastpercentage) {
+		// refresh in case icon changed
+		//consumeEvents(dpy, w, lastpercentage);
 		paint(w, lastpercentage);
-		usleep(10000);
+		consumeEvents(dpy, w, lastpercentage);
+		printf("updating icon without animation");
+	} else {
+		while(percentage != lastpercentage) {
+			// reset delta each time to give a slowdown effect
+			delta = (percentage - lastpercentage) / 25;
+			if(delta == 0) delta = percentage > lastpercentage ? 1 : -1;
+			printf("%d delta\n", delta);
+			lastpercentage += delta;
+
+			paint(w, lastpercentage);
+			consumeEvents(dpy, w, lastpercentage);
+			usleep(10000);
+		}
 	}
-	lastpercentage = percentage; // ???
-		consumeEvents(dpy, w, lastpercentage);
-		paint(w, lastpercentage);
+	//lastpercentage = percentage; // ???
 }
 
 
@@ -189,6 +200,7 @@ int main(int argc, char** argv) {
 	printf("cairodepth: %d\n", cairo_xlib_surface_get_depth(shape_surface));
 	shape_cairo = cairo_create(shape_surface);
 
+	consumeEvents(dpy, w, lastpercentage);
 	animateTo(dpy, w, getPercentageFromArgs(argv));
 	int timeout, percentage;
 	char icon[100];
