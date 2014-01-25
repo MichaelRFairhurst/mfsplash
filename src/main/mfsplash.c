@@ -13,7 +13,7 @@
 
 #define WIDTH 408
 #define HEIGHT 84
-#define ROUND_DIST 7
+#define ROUND_DIST 12
 #define APP_PATH "/var/lib/mfsplash/"
 #define LOCK_FILE "/var/lib/mfsplash/lock"
 #define CONTINUE_FILE "/var/lib/mfsplash/writable/.continue"
