@@ -1,15 +1,21 @@
 #!/bin/bash
 
-##
-# Launch this script with your X session to get automatic battery notifications when
-# 1. battery goes below 20%
-# 2. battery goes below 10%
-# 3. battery goes below 5%
-# 4. battery is at or below 3% and not plugged in
-# 5. battery is plugged in
-# 6. battery is unplugged
-##
+####
+## Launch this script with your X session to get automatic battery notifications when
+## 1. battery goes below 20%
+## 2. battery goes below 10%
+## 3. battery goes below 5%
+## 4. battery is at or below 3% and not plugged in
+## 5. battery is plugged in
+## 6. battery is unplugged
+####
 
+if [[ "$1" = "help" || "$1" = "--help" || "$1" = "-h" ]]
+then
+	echo Usage for $0
+	cat $0 | grep "^##" | grep -v "#!" | sed 's/^#\+//'
+	exit 0
+fi
 
 PREVBAT=100
 PREVCHG="false"
