@@ -147,7 +147,7 @@ void animateTo(Display* dpy, Window w, int percentage) {
 	} else {
 		while(percentage != lastpercentage) {
 			// reset delta each time to give a slowdown effect
-			delta = (percentage - lastpercentage) / 25;
+			delta = (percentage - lastpercentage) / 8;
 			if(delta == 0) delta = percentage > lastpercentage ? 1 : -1;
 			printf("%d delta\n", delta);
 			lastpercentage += delta;
