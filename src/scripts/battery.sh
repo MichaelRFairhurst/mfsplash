@@ -1,7 +1,16 @@
 #!/bin/bash
 
-DISCHARGING=`acpi | grep Charging`
-PERCENTAGE=`acpi | sed 's/Battery [0-9][^0-9]*\([0-9]*\)%.*/\1/'`
+##
+# Launch mfsplash with battery level.
+#
+# Has a separate charging vs not plugged in icon.
+#
+# Hook this up to a key combination, and use `batterywatch` for
+# automatic battery level popups
+##
+
+DISCHARGING=$(acpi | egrep "(Charging|Full)")
+PERCENTAGE=$(acpi | sed 's/Battery [0-9][^0-9]*\([0-9]*\)%.*/\1/')
 
 echo discharging $DISCHARGING percentage $PERCENTAGE
 

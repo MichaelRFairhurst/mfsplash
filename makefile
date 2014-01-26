@@ -16,6 +16,7 @@ install: bin/mfsplash
 	ln -s ${ROOT}/scripts/battery.sh ${BIN_DIR}/battery
 	ln -s ${ROOT}/scripts/volume.sh ${BIN_DIR}/volume
 	ln -s ${ROOT}/scripts/brightness.sh ${BIN_DIR}/brightness
+	ln -s ${ROOT}/scripts/batterywatch.sh ${BIN_DIR}/batterywatch
 	chmod 755 ${BIN_DIR}/mfsplash
 	chmod 755 ${BIN_DIR}/battery
 	chmod 755 ${BIN_DIR}/volume
@@ -25,6 +26,7 @@ uninstall:
 	rm -rf ${ROOT}
 	rm ${BIN_DIR}/mfsplash
 	rm ${BIN_DIR}/battery
+	rm ${BIN_DIR}/batterywatch
 	rm ${BIN_DIR}/volume
 	rm ${BIN_DIR}/brightness
 
