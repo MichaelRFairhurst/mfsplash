@@ -26,7 +26,7 @@ static cairo_t *cairo;
 static Display *dpy;
 static Window w;
 static pthread_t animator;
-static pthread_mutex_t percentagelock;
+static pthread_mutex_t animationlock;
 
 static cairo_surface_t *shape_surface;
 static cairo_t *shape_cairo;
@@ -145,12 +145,12 @@ void animateTo() {
 	int delta, lastpercentage = 0;
 
 	while(running) {
-		pthread_mutex_lock(&percentagelock);
+		pthread_mutex_lock(&animationlock);
 		if(percentage == lastpercentage) {
 			// refresh in case icon changed
 			//consumeEvents(dpy, w, lastpercentage);
 			paint(w, lastpercentage);
-			pthread_mutex_unlock(&percentagelock);
+			pthread_mutex_unlock(&animationlock);
 			consumeEvents(dpy, w);
 			printf("updating icon without animation");
 		} else {
@@ -164,12 +164,12 @@ void animateTo() {
 				lastpercentage += delta;
 
 				paint(w, lastpercentage);
-				pthread_mutex_unlock(&percentagelock);
+				pthread_mutex_unlock(&animationlock);
 				consumeEvents(dpy, w);
 				usleep(20000);
-				pthread_mutex_lock(&percentagelock);
+				pthread_mutex_lock(&animationlock);
 			}
-			pthread_mutex_unlock(&percentagelock);
+			pthread_mutex_unlock(&animationlock);
 		}
 		usleep(20000);
 	}
@@ -182,12 +182,12 @@ void pollForUpdate() {
 	for(timeout = 100; timeout > 0; timeout--, usleep(40000))
 	if(file = fopen(CONTINUE_FILE, "r")) {
 			fscanf(file, "%03d %s\n", &percentageupdate, icon);
-			image_icon = cairo_image_surface_create_from_png(icon);
 			fclose(file);
 			unlink(CONTINUE_FILE);
-			pthread_mutex_lock(&percentagelock);
+			pthread_mutex_lock(&animationlock);
+			image_icon = cairo_image_surface_create_from_png(icon);
 			percentage = percentageupdate;
-			pthread_mutex_unlock(&percentagelock);
+			pthread_mutex_unlock(&animationlock);
 			timeout = 100;
 			printf("staying open with %d and %s\n", percentageupdate, icon);
 	}
@@ -212,7 +212,7 @@ int main(int argc, char** argv) {
 		return 1;
 	}
 
-    if (pthread_mutex_init(&percentagelock, NULL) != 0)
+    if (pthread_mutex_init(&animationlock, NULL) != 0)
     {
         fprintf(stderr, "\n mutex init failed\n");
         return 3;
