@@ -136,7 +136,7 @@ void writeArgsToFile(char**argv) {
 }
 
 void animateTo(Display* dpy, Window w, int percentage) {
-	int delta;
+	int delta, mindelta;
 
 	if(percentage == lastpercentage) {
 		// refresh in case icon changed
@@ -145,16 +145,18 @@ void animateTo(Display* dpy, Window w, int percentage) {
 		consumeEvents(dpy, w, lastpercentage);
 		printf("updating icon without animation");
 	} else {
+		//mindelta = percentage - lastpercentage;
 		while(percentage != lastpercentage) {
 			// reset delta each time to give a slowdown effect
-			delta = (percentage - lastpercentage) / 8;
+			delta = (percentage - lastpercentage) / 5;
+			//if(delta < mindelta) delta = mindelta; // make sure slow blips still look animated;
 			if(delta == 0) delta = percentage > lastpercentage ? 1 : -1;
 			printf("%d delta\n", delta);
 			lastpercentage += delta;
 
 			paint(w, lastpercentage);
 			consumeEvents(dpy, w, lastpercentage);
-			usleep(10000);
+			usleep(20000);
 		}
 	}
 	//lastpercentage = percentage; // ???
