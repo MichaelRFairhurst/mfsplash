@@ -10,6 +10,7 @@
 #include <unistd.h>
 #include <sys/file.h>
 #include <X11/extensions/shape.h>
+#include <pthread.h>
 
 #define WIDTH 408
 #define HEIGHT 84
@@ -23,11 +24,16 @@
 static cairo_surface_t *surface;
 static cairo_t *cairo;
 static Display *dpy;
+static Window w;
+static pthread_t animator;
+static pthread_mutex_t percentagelock;
 
 static cairo_surface_t *shape_surface;
 static cairo_t *shape_cairo;
 static Pixmap shape;
-int lastpercentage = 0;
+
+int percentage;
+int running = 1;
 int fd;
 
 cairo_surface_t* image_icon;
@@ -88,7 +94,7 @@ void shapeit(Window w) {
                     cairo_xlib_surface_get_drawable(shape_surface), ShapeSet);
 }
 
-void consumeEvents(Display* dpy, Window w, int percentage) {
+void consumeEvents(Display* dpy, Window w) {
 	while (XPending(dpy)) {
 		XEvent e;
 		XNextEvent(dpy, &e);
@@ -135,33 +141,59 @@ void writeArgsToFile(char**argv) {
 	fclose(file);
 }
 
-void animateTo(Display* dpy, Window w, int percentage) {
-	int delta, mindelta;
+void animateTo() {
+	int delta, lastpercentage = 0;
 
-	if(percentage == lastpercentage) {
-		// refresh in case icon changed
-		//consumeEvents(dpy, w, lastpercentage);
-		paint(w, lastpercentage);
-		consumeEvents(dpy, w, lastpercentage);
-		printf("updating icon without animation");
-	} else {
-		//mindelta = percentage - lastpercentage;
-		while(percentage != lastpercentage) {
-			// reset delta each time to give a slowdown effect
-			delta = (percentage - lastpercentage) / 5;
-			//if(delta < mindelta) delta = mindelta; // make sure slow blips still look animated;
-			if(delta == 0) delta = percentage > lastpercentage ? 1 : -1;
-			printf("%d delta\n", delta);
-			lastpercentage += delta;
-
+	while(running) {
+		pthread_mutex_lock(&percentagelock);
+		if(percentage == lastpercentage) {
+			// refresh in case icon changed
+			//consumeEvents(dpy, w, lastpercentage);
 			paint(w, lastpercentage);
-			consumeEvents(dpy, w, lastpercentage);
-			usleep(20000);
+			pthread_mutex_unlock(&percentagelock);
+			consumeEvents(dpy, w);
+			printf("updating icon without animation");
+		} else {
+			//mindelta = percentage - lastpercentage;
+			while(percentage != lastpercentage) {
+				// reset delta each time to give a slowdown effect
+				delta = (percentage - lastpercentage) / 5;
+				//if(delta < mindelta) delta = mindelta; // make sure slow blips still look animated;
+				if(delta == 0) delta = percentage > lastpercentage ? 1 : -1;
+				printf("%d delta\n", delta);
+				lastpercentage += delta;
+
+				paint(w, lastpercentage);
+				pthread_mutex_unlock(&percentagelock);
+				consumeEvents(dpy, w);
+				usleep(20000);
+				pthread_mutex_lock(&percentagelock);
+			}
+			pthread_mutex_unlock(&percentagelock);
 		}
+		usleep(20000);
 	}
-	//lastpercentage = percentage; // ???
 }
 
+void pollForUpdate() {
+	int timeout, percentageupdate;
+	char icon[100];
+	FILE* file;
+	for(timeout = 100; timeout > 0; timeout--, usleep(40000))
+	if(file = fopen(CONTINUE_FILE, "r")) {
+			fscanf(file, "%03d %s\n", &percentageupdate, icon);
+			image_icon = cairo_image_surface_create_from_png(icon);
+			fclose(file);
+			unlink(CONTINUE_FILE);
+			pthread_mutex_lock(&percentagelock);
+			percentage = percentageupdate;
+			pthread_mutex_unlock(&percentagelock);
+			timeout = 100;
+			printf("staying open with %d and %s\n", percentageupdate, icon);
+	}
+
+	running = 0;
+}
 
 int main(int argc, char** argv) {
 	if(argc != 3) {
@@ -180,7 +212,12 @@ int main(int argc, char** argv) {
 		return 1;
 	}
 
-	Window w;
+    if (pthread_mutex_init(&percentagelock, NULL) != 0)
+    {
+        fprintf(stderr, "\n mutex init failed\n");
+        return 3;
+    }
+
 	w = XCreateSimpleWindow(dpy, RootWindow(dpy, 0),
 	                        970 - (WIDTH>>1), 970, WIDTH, HEIGHT, 0, 0, BlackPixel(dpy, 0));
 	XSetWindowAttributes winattr;
@@ -202,21 +239,15 @@ int main(int argc, char** argv) {
 	printf("cairodepth: %d\n", cairo_xlib_surface_get_depth(shape_surface));
 	shape_cairo = cairo_create(shape_surface);
 
-	consumeEvents(dpy, w, lastpercentage);
-	animateTo(dpy, w, getPercentageFromArgs(argv));
-	int timeout, percentage;
-	char icon[100];
-	FILE* file;
-	for(timeout = 100; timeout > 0; timeout--, usleep(40000))
-	if(file = fopen(CONTINUE_FILE, "r")) {
-			fscanf(file, "%03d %s\n", &percentage, icon);
-			image_icon = cairo_image_surface_create_from_png(icon);
-			fclose(file);
-			unlink(CONTINUE_FILE);
-			animateTo(dpy, w, percentage);
-			timeout = 100;
-			printf("staying open with %d and %s\n", percentage, icon);
-	}
+	consumeEvents(dpy, w);
+
+	percentage = getPercentageFromArgs(argv);
+	pthread_create(&animator, NULL, &animateTo, NULL);
+	/*int err = pthread_create(&animator, NULL, &animateTo, (void*) getPercentageFromArgs(argv));
+	if (err != 0)
+		printf("\ncan't create thread :[%s]", strerror(err));*/
+
+	pollForUpdate();
 
 	releaseLock();
 	return 0;
