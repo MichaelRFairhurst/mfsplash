@@ -53,6 +53,13 @@ void paint(Window w, int percentage) {
 	cairo_set_source_surface(cairo, image_bar, 0, 0);
 	cairo_rectangle(cairo, 0, 0, 78 + (int)(3.14*percentage), HEIGHT);
 	cairo_fill(cairo);
+
+	char percentagetext[6]; // "100 %\0"
+	sprintf(percentagetext, "%d %%", percentage);
+
+	cairo_set_source_rgba(cairo, .5, .5, .5, .5);
+	cairo_move_to(cairo, 70, 25);
+	cairo_show_text(cairo, percentagetext);
 }
 
 void cairo_rounded_rectangle(cairo_t* cairo, int x, int y, int w, int h, int r) {
