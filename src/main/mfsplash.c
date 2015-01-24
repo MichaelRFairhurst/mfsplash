@@ -142,9 +142,17 @@ char* getIconFromArgs(char**argv) {
 	return argv[1];
 }
 
-void writeArgsToFile(char**argv) {
+int getIsUpdatingFromArgv(char**argv) {
+	return atoi(argv[3]);
+}
+
+void writeArgsToFile(int argc, char**argv) {
 	FILE* file = fopen(CONTINUE_FILE, "w+");
-	fprintf(file, "%03d %s\n", getPercentageFromArgs(argv), getIconFromArgs(argv));
+	if(argc == 3) {
+		fprintf(file, "%03d %s 0\n", getPercentageFromArgs(argv), getIconFromArgs(argv));
+	} else {
+		fprintf(file, "%03d %s %01d\n", getPercentageFromArgs(argv), getIconFromArgs(argv), getIsUpdatingFromArgv(argv));
+	}
 	fclose(file);
 }
 
@@ -183,19 +191,19 @@ void animateTo() {
 }
 
 void pollForUpdate() {
-	int timeout, percentageupdate;
+	int timeout, percentageupdate, update;
 	char icon[100];
 	FILE* file;
-	for(timeout = 100; timeout > 0; timeout--, usleep(40000))
+	for(timeout = 200; timeout > 0; timeout--, usleep(40000))
 	if(file = fopen(CONTINUE_FILE, "r")) {
-			fscanf(file, "%03d %s\n", &percentageupdate, icon);
+			fscanf(file, "%03d %s %01d\n", &percentageupdate, icon, &update);
 			fclose(file);
 			unlink(CONTINUE_FILE);
 			pthread_mutex_lock(&animationlock);
 			image_icon = cairo_image_surface_create_from_png(icon);
 			percentage = percentageupdate;
 			pthread_mutex_unlock(&animationlock);
-			timeout = 100;
+			if(!update) timeout = 200;
 			printf("staying open with %d and %s\n", percentageupdate, icon);
 	}
 
@@ -203,13 +211,18 @@ void pollForUpdate() {
 }
 
 int main(int argc, char** argv) {
-	if(argc != 3) {
-		printf("bad args. Run like 'splashes the_icon.png 94'\n");
+	if(argc < 2 || argc > 4) {
+		printf("bad args. Run like 'splashes the_icon.png 94 [0]'\n");
 		return 2;
 	}
 
 	if(!acquireLock()) {
-		writeArgsToFile(argv);
+		writeArgsToFile(argc, argv);
+		return 0;
+	}
+
+	if(argc == 4) {
+		printf("No popup to update, stopping.\n");
 		return 0;
 	}
 
