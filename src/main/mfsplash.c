@@ -156,7 +156,7 @@ void writeArgsToFile(int argc, char**argv) {
 	fclose(file);
 }
 
-void animateTo() {
+void* animateTo(void* unusedArg) {
 	int delta, lastpercentage = 0;
 
 	while(running) {
@@ -239,7 +239,7 @@ int main(int argc, char** argv) {
     }
 
 	w = XCreateSimpleWindow(dpy, RootWindow(dpy, 0),
-	                        970 - (WIDTH>>1), 970, WIDTH, HEIGHT, 0, 0, BlackPixel(dpy, 0));
+	                        2860 - WIDTH, 1780 - HEIGHT, WIDTH, HEIGHT, 0, 0, BlackPixel(dpy, 0));
 	XSetWindowAttributes winattr;
 	winattr.override_redirect = 1;
 	XChangeWindowAttributes(dpy, w, CWOverrideRedirect, &winattr);

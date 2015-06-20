@@ -39,7 +39,7 @@ fi
 
 [ -z "$NEXT" ] && echo "Provide a bightness please - up down or a number" && exit 2
 [ $NEXT -lt 0 ] && echo "at min" && exit 4
-[ $NEXT -gt 10 ] && echo "at max" && exit 4
+[ $NEXT -gt 1953 ] && echo "at max" && exit 4
 if [ "$(id -u)" != "0" ]; then
 	echo "Sorry, you are not root."
 	exit 1
