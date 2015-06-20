@@ -27,11 +27,11 @@ CURRENT=$(cat /sys/class/backlight/acpi_video0/brightness)
 
 if [ "$1" = "up" ]
 then
-	NEXT=$(( $CURRENT + 1 ))
+	NEXT=$(( $CURRENT + 10 ))
 else
 	if [ "$1" = "down" ]
 	then
-		NEXT=$(( $CURRENT - 1 ))
+		NEXT=$(( $CURRENT - 10 ))
 	else
 		NEXT=$1
 	fi
