@@ -14,6 +14,7 @@
 
 #define WIDTH 408
 #define HEIGHT 84
+#define PAD 8
 #define ROUND_DIST 12
 #define APP_PATH "/var/lib/mfsplash/"
 #define LOCK_FILE "/var/lib/mfsplash/lock"
@@ -238,8 +239,16 @@ int main(int argc, char** argv) {
         return 3;
     }
 
-	w = XCreateSimpleWindow(dpy, RootWindow(dpy, 0),
-	                        2860 - WIDTH, 1780 - HEIGHT, WIDTH, HEIGHT, 0, 0, BlackPixel(dpy, 0));
+  Screen* defaultScreen = DefaultScreenOfDisplay(dpy);
+	w = XCreateSimpleWindow(dpy,
+                          RootWindow(dpy, 0),
+	                        defaultScreen->width - WIDTH - PAD,
+                          defaultScreen->height - HEIGHT - PAD,
+                          WIDTH,
+                          HEIGHT,
+                          0,
+                          0,
+                          BlackPixel(dpy, 0));
 	XSetWindowAttributes winattr;
 	winattr.override_redirect = 1;
 	XChangeWindowAttributes(dpy, w, CWOverrideRedirect, &winattr);

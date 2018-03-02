@@ -10,10 +10,8 @@
 ##
 ## Bind to a key combination in your window manager. requires root perms
 ##
-## This may not work exactly for your laptop. The /sys/ path may not be
-## the same on all systems. Also check for a max_brightness file, it may
-## accept brightnesses from 0 to 100000000 which would require a tweak or
-## two to this script....
+## This may not work exactly for your laptop. The /sys/class/backlight path may
+## not be the same on all systems.
 ####
 
 if [[ "$1" = "help" || "$1" = "--help" || "$1" = "-h" ]]
@@ -23,27 +21,38 @@ then
 	exit 0
 fi
 
-CURRENT=$(cat /sys/class/backlight/acpi_video0/brightness)
-
-if [ "$1" = "up" ]
-then
-	NEXT=$(( $CURRENT + 10 ))
-else
-	if [ "$1" = "down" ]
-	then
-		NEXT=$(( $CURRENT - 10 ))
-	else
-		NEXT=$1
-	fi
-fi
-
-[ -z "$NEXT" ] && echo "Provide a bightness please - up down or a number" && exit 2
-[ $NEXT -lt 0 ] && echo "at min" && exit 4
-[ $NEXT -gt 1953 ] && echo "at max" && exit 4
 if [ "$(id -u)" != "0" ]; then
 	echo "Sorry, you are not root."
 	exit 1
 fi
-echo $NEXT > /sys/class/backlight/acpi_video0/brightness
 
-mfsplash /var/lib/mfsplash/icon/brightness.png "$NEXT"0
+SCREENROOT="/sys/class/backlight"
+SCREEN="$SCREENROOT/$(ls $SCREENROOT | head -n 1)"
+CURRENT=$(cat $SCREEN/brightness)
+MAX=$(cat $SCREEN/max_brightness)
+
+[ $CURRENT -gt 0 ] || (echo "at min" && exit 4)
+[ $CURRENT -lt $MAX ] || (echo "at max" && exit 4)
+
+INPCT=$(( $CURRENT * 100 / $MAX ))
+
+if [ "$1" = "up" ]; then
+	INPCT=$(( $INPCT + 10 ))
+elif [ "$1" = "down" ]; then
+	INPCT=$(( $INPCT - 10 ))
+else
+  INPCT=$1
+fi
+
+NEXT=$(( $INPCT * $MAX / 100 ))
+
+[ -z "$NEXT" ] && echo "Provide a bightness please - up down or a number" && exit 2
+if [ $NEXT -gt $MAX ]; then
+  NEXT=$MAX
+elif [ $NEXT -lt 0 ]; then
+  NEXT=0
+fi
+
+echo $NEXT > $SCREEN/brightness
+
+mfsplash /var/lib/mfsplash/icon/brightness.png "$INPCT"
