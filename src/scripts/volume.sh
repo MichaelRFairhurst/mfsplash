@@ -4,9 +4,10 @@
 ## Set master volume level, and display splash with new level
 ##
 ## Usage:
-##   battery up -- +2% battery
-##   battery down -- -2% battery
-##   battery [int] -- set to int% battery
+##   volume up -- +2% volume
+##   volume down -- -2% volume
+##   volume toggle -- toggle mute
+##   volume [int] -- set to int% volume
 ##
 ## Bind to key combinations in your window manager
 ####
@@ -21,11 +22,22 @@ fi
 CURRENTVOL=$(amixer get Master | tail -n 1 | sed 's/^[^\[]*\[\([0-9]\+\)%\].*/\1/')
 
 case $1 in
+  toggle)
+    amixer sset Master toggle | grep -q \\[on\\]
+    if [[ $? -eq 0 ]]; then
+      mfsplash /var/lib/mfsplash/icon/volume.png $CURRENTVOL
+    else
+      mfsplash /var/lib/mfsplash/icon/volume.png 0
+    fi
+    exit 0
+    ;;
+    
 	up) NEXTVOL=$((CURRENTVOL+2)) ;;
 	down) NEXTVOL=$((CURRENTVOL-2)) ;;
 	*) NEXTVOL=$1 ;;
 esac
 
-ech set volume to $NEXTVOL
-amixer set Master $NEXTVOL%
+echo set volume to $NEXTVOL
+amixer sset Master $NEXTVOL%
+amixer sset Master on
 mfsplash /var/lib/mfsplash/icon/volume.png $NEXTVOL

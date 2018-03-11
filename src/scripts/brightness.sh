@@ -22,8 +22,7 @@ then
 fi
 
 if [ "$(id -u)" != "0" ]; then
-	echo "Sorry, you are not root."
-	exit 1
+	echo "Warning: changing backlight may require root...Trying anyways."
 fi
 
 SCREENROOT="/sys/class/backlight"
@@ -37,14 +36,18 @@ MAX=$(cat $SCREEN/max_brightness)
 INPCT=$(( $CURRENT * 100 / $MAX ))
 
 if [ "$1" = "up" ]; then
-	INPCT=$(( $INPCT + 10 ))
+	INPCT=$(( $INPCT + 2 ))
 elif [ "$1" = "down" ]; then
-	INPCT=$(( $INPCT - 10 ))
+	INPCT=$(( $INPCT - 2 ))
 else
   INPCT=$1
 fi
 
 NEXT=$(( $INPCT * $MAX / 100 ))
+
+if [[ $NEXT -eq $CURRENT ]] ; then
+  NEXT=$(( $CURRENT + 1 ))
+fi
 
 [ -z "$NEXT" ] && echo "Provide a bightness please - up down or a number" && exit 2
 if [ $NEXT -gt $MAX ]; then

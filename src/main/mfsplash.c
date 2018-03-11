@@ -6,6 +6,7 @@
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 #include <stdio.h>
+#include <string.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/file.h>
@@ -19,8 +20,9 @@
 #define APP_PATH "/var/lib/mfsplash/"
 #define LOCK_FILE "/var/lib/mfsplash/lock"
 #define CONTINUE_FILE "/var/lib/mfsplash/writable/.continue"
-#define BG_FILE "/var/lib/mfsplash/fill/bg.png"
-#define METER_FILE "/var/lib/mfsplash/fill/meter.png"
+#define BG_METER_FILE "/var/lib/mfsplash/fill/bg_meter.png"
+#define BG_TEXT_FILE "/var/lib/mfsplash/fill/bg_text.png"
+#define METER_FILL_FILE "/var/lib/mfsplash/fill/meter_fill.png"
 
 static cairo_surface_t *surface;
 static cairo_t *cairo;
@@ -34,24 +36,33 @@ static cairo_t *shape_cairo;
 static Pixmap shape;
 
 int percentage;
+char* text;
+char* icon;
+
 int running = 1;
 int fd;
 
-cairo_surface_t* image_icon;
-cairo_surface_t* image_bar;
-cairo_surface_t* background;
+cairo_surface_t* image_icon = NULL;
+cairo_surface_t* meter_fill;
+cairo_surface_t* background_meter;
+cairo_surface_t* background_text;
 
-void paint(Window w, int percentage) {
-	cairo_set_source_surface(cairo, background, 0,0);
+void paintBase(Window w, cairo_surface_t* bg) {
+	cairo_set_source_surface(cairo, bg, 0,0);
 	cairo_rectangle(cairo, 0, 0, WIDTH, HEIGHT);
 	cairo_fill(cairo);
 	int width = cairo_image_surface_get_width(image_icon);
 	int height = cairo_image_surface_get_height(image_icon);
+  
 	cairo_set_source_surface(cairo, image_icon, 37 - (width>>1), (HEIGHT>>1) - (height>>1));
 	cairo_rectangle(cairo, 0, 0, 100, HEIGHT);
 	cairo_fill(cairo);
+}
 
-	cairo_set_source_surface(cairo, image_bar, 0, 0);
+void paintPercentage(Window w, int percentage) {
+  paintBase(w, background_meter);
+
+	cairo_set_source_surface(cairo, meter_fill, 0, 0);
 	cairo_rectangle(cairo, 0, 0, 78 + (int)(3.14*percentage), HEIGHT);
 	cairo_fill(cairo);
 
@@ -60,7 +71,20 @@ void paint(Window w, int percentage) {
 
 	cairo_set_source_rgba(cairo, .5, .5, .5, .5);
 	cairo_move_to(cairo, 70, 25);
+  cairo_set_font_size(cairo, 10);
 	cairo_show_text(cairo, percentagetext);
+}
+
+void paintText(Window w, const char* text) {
+  paintBase(w, background_text);
+
+  cairo_text_extents_t extents;
+  cairo_select_font_face(cairo, "monospace", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
+	cairo_set_source_rgba(cairo, 0.8, 0.8, 0.8, 0.5);
+  cairo_set_font_size(cairo, 16);
+  cairo_text_extents(cairo, text, &extents);
+  cairo_move_to(cairo, WIDTH/2 - (extents.width/2 + extents.x_bearing), HEIGHT/2 - (extents.height/2 + extents.y_bearing));
+  cairo_show_text(cairo, text);
 }
 
 void cairo_rounded_rectangle(cairo_t* cairo, int x, int y, int w, int h, int r) {
@@ -112,14 +136,14 @@ void consumeEvents(Display* dpy, Window w) {
 			//case ConfigureNotify:
 			//case Expose:
 			case MapNotify:
-				//paint(w, percentage);
+				//paintPercentage(w, percentage);
 				shapeit(w);
 				break;
 		}
 	}
 }
 
-int acquireLock() {
+int acquireProcessLock() {
 	fd = open(LOCK_FILE, O_RDONLY);
 	if(flock(fd, LOCK_EX | LOCK_NB) == -1) {
 		close(fd);
@@ -130,30 +154,44 @@ int acquireLock() {
 	return 1;
 }
 
-void releaseLock() {
+void releaseProcessLock() {
 	flock(fd, LOCK_UN);
 	close(fd);
 }
 
-int getPercentageFromArgs(char**argv) {
-	return atoi(argv[2]);
-}
+int parseArgs(int argc, char**argv) {
+  text = NULL;
+  percentage = -1;
 
-char* getIconFromArgs(char**argv) {
-	return argv[1];
-}
-
-int getIsUpdatingFromArgv(char**argv) {
-	return atoi(argv[3]);
-}
-
-void writeArgsToFile(int argc, char**argv) {
-	FILE* file = fopen(CONTINUE_FILE, "w+");
-	if(argc == 3) {
-		fprintf(file, "%03d %s 0\n", getPercentageFromArgs(argv), getIconFromArgs(argv));
-	} else {
-		fprintf(file, "%03d %s %01d\n", getPercentageFromArgs(argv), getIconFromArgs(argv), getIsUpdatingFromArgv(argv));
+	if(argc < 2 || argc > 10) {
+		printf("bad args. Usage: \n"
+        "mfsplash the_icon.png [ --text 'what to show' | 94 [0] ]'\n");
+		return 1;
 	}
+
+  icon = malloc(255);
+  strcpy(icon, argv[1]);
+  if (strcmp(argv[2], "--text") == 0) {
+    if (argc < 3) {
+      printf("no text specified after --text\n");
+      return 1;
+    }
+    text = malloc(255);
+    strcpy(text, argv[3]);
+  } else {
+    percentage = atoi(argv[2]);
+  }
+  
+  return 0;
+}
+
+void notifyExistingProcess() {
+	FILE* file = fopen(CONTINUE_FILE, "w+");
+  fprintf(file,
+      "%d %s %s\n",
+      percentage,
+      icon,
+      text);
 	fclose(file);
 }
 
@@ -162,16 +200,22 @@ void* animateTo(void* unusedArg) {
 
 	while(running) {
 		pthread_mutex_lock(&animationlock);
-		if(percentage == lastpercentage) {
-			// refresh in case icon changed
-			//consumeEvents(dpy, w, lastpercentage);
-			paint(w, lastpercentage);
+    if(percentage == -1) {
+			paintText(w, text);
 			pthread_mutex_unlock(&animationlock);
 			consumeEvents(dpy, w);
-			printf("updating icon without animation");
+			printf("updating text or icon without animation\n");
+      // just showing text
+    } else if(percentage == lastpercentage) {
+			// refresh in case icon changed
+			//consumeEvents(dpy, w, lastpercentage);
+			paintPercentage(w, lastpercentage);
+			pthread_mutex_unlock(&animationlock);
+			consumeEvents(dpy, w);
+			printf("updating icon without animation\n");
 		} else {
 			//mindelta = percentage - lastpercentage;
-			while(percentage != lastpercentage) {
+			while(percentage != lastpercentage && percentage != -1) {
 				// reset delta each time to give a slowdown effect
 				delta = (percentage - lastpercentage) / 5;
 				//if(delta < mindelta) delta = mindelta; // make sure slow blips still look animated;
@@ -179,7 +223,7 @@ void* animateTo(void* unusedArg) {
 				printf("%d delta\n", delta);
 				lastpercentage += delta;
 
-				paint(w, lastpercentage);
+				paintPercentage(w, lastpercentage);
 				pthread_mutex_unlock(&animationlock);
 				consumeEvents(dpy, w);
 				usleep(20000);
@@ -191,39 +235,54 @@ void* animateTo(void* unusedArg) {
 	}
 }
 
+void create_surface_for_icon() {
+  if (image_icon != NULL) {
+    cairo_surface_destroy(image_icon);
+  }
+
+	image_icon = cairo_image_surface_create_from_png(icon);
+}
+
 void pollForUpdate() {
-	int timeout, percentageupdate, update;
-	char icon[100];
+	int timeout, percentageupdate;
 	FILE* file;
+  char newtext[255] = {'\0'};
+  char newicon[100] = {'\0'};
 	for(timeout = 200; timeout > 0; timeout--, usleep(40000))
 	if(file = fopen(CONTINUE_FILE, "r")) {
-			fscanf(file, "%03d %s %01d\n", &percentageupdate, icon, &update);
-			fclose(file);
-			unlink(CONTINUE_FILE);
-			pthread_mutex_lock(&animationlock);
-			image_icon = cairo_image_surface_create_from_png(icon);
-			percentage = percentageupdate;
-			pthread_mutex_unlock(&animationlock);
-			if(!update) timeout = 200;
-			printf("staying open with %d and %s\n", percentageupdate, icon);
+		fscanf(file, "%u %s %[^\n]s\n", &percentageupdate, &newicon, &newtext);
+		fclose(file);
+		unlink(CONTINUE_FILE);
+		pthread_mutex_lock(&animationlock);
+		percentage = percentageupdate;
+    strcpy(icon, newicon);
+    if (strlen(newtext) == 0) {
+      if (text != NULL) {
+        free(text);
+      }
+      text = NULL;
+    } else {
+      if (text == NULL) {
+        text = malloc(255);
+      }
+      strcpy(text, newtext);
+    }
+    create_surface_for_icon();
+		pthread_mutex_unlock(&animationlock);
+		timeout = 200;
+		printf("staying open with %d/%s and %s\n", percentageupdate, text, icon);
 	}
 
 	running = 0;
 }
 
 int main(int argc, char** argv) {
-	if(argc < 2 || argc > 4) {
-		printf("bad args. Run like 'splashes the_icon.png 94 [0]'\n");
-		return 2;
-	}
+  if (parseArgs(argc, argv)) {
+    return 2;
+  }
 
-	if(!acquireLock()) {
-		writeArgsToFile(argc, argv);
-		return 0;
-	}
-
-	if(argc == 4) {
-		printf("No popup to update, stopping.\n");
+	if(!acquireProcessLock()) {
+		notifyExistingProcess();
 		return 0;
 	}
 
@@ -258,9 +317,10 @@ int main(int argc, char** argv) {
 
 	surface = cairo_xlib_surface_create(dpy, w, DefaultVisual(dpy, 0), WIDTH, HEIGHT);
 	cairo = cairo_create(surface);
-	background = cairo_image_surface_create_from_png(BG_FILE);
-	image_icon = cairo_image_surface_create_from_png(getIconFromArgs(argv));
-	image_bar = cairo_image_surface_create_from_png(METER_FILE);
+	background_meter = cairo_image_surface_create_from_png(BG_METER_FILE);
+	background_text = cairo_image_surface_create_from_png(BG_TEXT_FILE);
+	create_surface_for_icon();
+	meter_fill = cairo_image_surface_create_from_png(METER_FILL_FILE);
 	shape = XCreatePixmap(dpy, w, WIDTH, HEIGHT, 1);
 	shape_surface = cairo_xlib_surface_create_for_bitmap(dpy, shape,
 	                                                     DefaultScreenOfDisplay(dpy),
@@ -270,15 +330,14 @@ int main(int argc, char** argv) {
 
 	consumeEvents(dpy, w);
 
-	percentage = getPercentageFromArgs(argv);
 	pthread_create(&animator, NULL, &animateTo, NULL);
-	/*int err = pthread_create(&animator, NULL, &animateTo, (void*) getPercentageFromArgs(argv));
+	/*int err = pthread_create(&animator, NULL, &animateTo, (void*) percentage);
 	if (err != 0)
 		printf("\ncan't create thread :[%s]", strerror(err));*/
 
 	pollForUpdate();
 
-	releaseLock();
+	releaseProcessLock();
 	return 0;
 }
 
