@@ -2,7 +2,7 @@ ROOT=/var/lib/mfsplash
 BIN_DIR=/usr/local/sbin
 
 bin/mfsplash: src/main/mfsplash.c
-	gcc src/main/mfsplash.c -lX11 -lcairo -lXext -o bin/mfsplash -g -lpthread
+	gcc src/main/mfsplash.c -lX11 -lcairo -lXext -lXrandr -o bin/mfsplash -g -lpthread
 
 install: bin/mfsplash
 	mkdir ${ROOT}

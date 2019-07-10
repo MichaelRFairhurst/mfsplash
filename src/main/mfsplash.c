@@ -11,6 +11,7 @@
 #include <unistd.h>
 #include <sys/file.h>
 #include <X11/extensions/shape.h>
+#include <X11/extensions/Xrandr.h>
 #include <pthread.h>
 
 #define WIDTH 408
@@ -276,6 +277,23 @@ void pollForUpdate() {
 	running = 0;
 }
 
+void getDefaultScreenDimensions(int* x, int* y) {
+  XRRScreenResources* screenResources
+    = XRRGetScreenResources(dpy, DefaultRootWindow(dpy));
+
+  XRROutputInfo* screenInfo
+    = XRRGetOutputInfo(dpy, screenResources, screenResources->outputs[screenResources->noutput - 1]);
+
+  XRRCrtcInfo* crtcInfo = XRRGetCrtcInfo(dpy, screenResources, screenResources->crtcs[0]);
+
+  *x = crtcInfo->x + crtcInfo->width - WIDTH - PAD;
+  *y = crtcInfo->y + crtcInfo->height - HEIGHT - PAD;
+
+  XRRFreeCrtcInfo(crtcInfo);
+  XRRFreeOutputInfo(screenInfo);
+  XRRFreeScreenResources(screenResources);
+}
+
 int main(int argc, char** argv) {
   if (parseArgs(argc, argv)) {
     return 2;
@@ -292,17 +310,20 @@ int main(int argc, char** argv) {
 		return 1;
 	}
 
-    if (pthread_mutex_init(&animationlock, NULL) != 0)
-    {
-        fprintf(stderr, "\n mutex init failed\n");
-        return 3;
-    }
+  if (pthread_mutex_init(&animationlock, NULL) != 0)
+  {
+      fprintf(stderr, "\n mutex init failed\n");
+      return 3;
+  }
 
-  Screen* defaultScreen = DefaultScreenOfDisplay(dpy);
+  int x, y;
+
+  getDefaultScreenDimensions(&x, &y);
+
 	w = XCreateSimpleWindow(dpy,
                           RootWindow(dpy, 0),
-	                        defaultScreen->width - WIDTH - PAD,
-                          defaultScreen->height - HEIGHT - PAD,
+	                        x,
+                          y,
                           WIDTH,
                           HEIGHT,
                           0,
